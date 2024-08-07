@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/107/107703.png" type="image/png">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <title>Mobile Number Details Search</title>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            margin-top: 20px;
+        }
+        .card {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        table {
+            margin-top: 20px;
+        }
+        @media (max-width: 576px) {
+            .card {
+                margin-bottom: 20px;
+            }
+            table {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title text-center">Mobile Number Details Search</h5>
+                <form id="searchForm">
+                    <div class="form-group">
+                        <label for="mobileNumber">Enter Mobile Number</label>
+                        <input type="text" class="form-control" id="mobileNumber" placeholder="e.g., 9707070707" required maxlength="10">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Search</button>
+                </form>
+                <div id="result" class="mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Table to display the mobile number details -->
+        <div class="card mt-3" id="dataTable" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title text-center">Mobile Number Details</h5>
+                <button id="exportBtn" class="btn btn-success mb-3">Export as PDF</button>
+                <table class="table table-bordered table-striped">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>Params</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+    <script>
+        // Toastr options
+        toastr.options = {
+            "closeButton": true,
+            "debug": false,
+            "newestOnTop": true,
+            "progressBar": true,
+            "positionClass": "toast-top-right",
+            "preventDuplicates": false,
+            "onclick": null,
+            "showDuration": "300",
+            "hideDuration": "1000",
+            "timeOut": "5000",
+            "extendedTimeOut": "1000",
+            "showEasing": "swing",
+            "hideEasing": "linear",
+            "showMethod": "fadeIn",
+            "hideMethod": "fadeOut"
+        };
+
+        $(document).ready(function() {
+            $('#searchForm').on('submit', function(e) {
+                e.preventDefault();
+                const mobileNumber = $('#mobileNumber').val();
+
+                // Validate mobile number length
+                if (mobileNumber.length !== 10) {
+                    toastr.error('Mobile number must be exactly 10 digits.');
+                    return;
+                }
+
+                // API call
+                const settings = {
+                    async: true,
+                    crossDomain: true,
+                    url: 'https://cors-anywhere.herokuapp.com/https://mobileinfo.p.rapidapi.com/v1/mobile/track',
+                    method: 'POST',
+                    headers: {
+                        'x-rapidapi-key': 'c4693662a8msh71c8b8b9956e2d6p1b8b1bjsn12ed7360e392',
+                        'x-rapidapi-host': 'mobileinfo.p.rapidapi.com',
+                        'Content-Type': 'application/json'
+                    },
+                    processData: false,
+                    data: JSON.stringify({ mobile: mobileNumber }) // Send the mobile number without prefix
+                };
+
+                $.ajax(settings).done(function(response) {
+                    console.log(response);
+                    // Populate the table with response data
+                    $('#dataBody').html(`
+                        <tr>
+                            <td>Mobile</td>
+                            <td>${response.mobile}</td>
+                        </tr>
+                        <tr>
+                            <td>Latitude</td>
+                            <td>${response.lat}</td>
+                        </tr>
+                        <tr>
+                            <td>Longitude</td>
+                            <td>${response.lon}</td>
+                        </tr>
+                        <tr>
+                            <td>Circle</td>
+                            <td>${response.circle}</td>
+                        </tr>
+                        <tr>
+                            <td>Operator</td>
+                            <td>${response.operator}</td>
+                        </tr>
+                        <tr>
+                            <td>Circle Code</td>
+                            <td>${response.circle_code}</td>
+                        </tr>
+                        <tr>
+                            <td>Operator Code</td>
+                            <td>${response.operator_code}</td>
+                        </tr>
+                        <tr>
+                            <td>Operator Company</td>
+                            <td>${response.operator_company}</td>
+                        </tr>
+                    `);
+                    $('#dataTable').show(); // Show the table
+                    toastr.success('Search successful!');
+                }).fail(function() {
+                    $('#result').html(`<div class="alert alert-danger">No details found for this mobile number.</div>`);
+                    toastr.error('Search failed. Please try again.');
+                });
+            });
+
+            // Export to PDF functionality
+            $('#exportBtn').on('click', function() {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                doc.setFontSize(12);
+                doc.text("Mobile Number Details", 14, 10);
+
+                // Get table data
+                const table = document.getElementById("dataTable");
+                const rows = Array.from(table.getElementsByTagName("tr"));
+
+                // Add rows to PDF
+                let rowHeight = 10;
+                let margin = 14;
+                rows.forEach((row, index) => {
+                    const cols = row.getElementsByTagName("td");
+                    const headerCols = row.getElementsByTagName("th");
+                    if (headerCols.length) { // Header row
+                        doc.setFont("bold");
+                        doc.text(headerCols[0].innerText, margin, 20 + rowHeight * index);
+                        doc.text(headerCols[1].innerText, margin + 100, 20 + rowHeight * index);
+                    } else if (cols.length) { // Data row
+                        doc.setFont("normal");
+                        doc.text(cols[0].innerText, margin, 20 + rowHeight * index);
+                        doc.text(cols[1].innerText, margin + 100, 20 + rowHeight * index);
+                    }
+                });
+
+                doc.save("mobile_number_details.pdf");
+                toastr.success('PDF exported successfully!');
+            });
+        });
+    </script>
+</body>
+</html>
